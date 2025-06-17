@@ -70,29 +70,45 @@ def entropy(Omega):
 
 
 def plot_entropy_temperature():
-    E = np.linspace(1e-21, 1e-19, 100)
-    Omega = E ** 3
-    S = entropy(Omega)
+    # Configurações iniciais
+    k = 1.380649e-23  # Constante de Boltzmann
+    N = 1.0  # Vamos trabalhar com N=1 para evitar overflow
+
+    # Valores de energia fisicamente razoáveis
+    E = np.linspace(1e-21, 5e-21, 100)  # Intervalo típico para poucas partículas
+
+    # Cálculo CORRETO usando logaritmos para evitar overflow
+    log_Omega = (3 * N / 2) * np.log(E)  # ln(Ω) = (3N/2)ln(E)
+    S = k * log_Omega  # S = k ln(Ω)
+
+    # Derivada numérica estável
     dSdE = np.gradient(S, E)
     T = 1 / dSdE
 
+    # Plotagem
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
+    # Gráfico 1: Entropia vs Energia
     ax1.plot(E, S, 'b-')
-    ax1.set_title('Entropia vs Energia')
+    ax1.set_title('Entropia vs Energia\nS proporcional ln(E)')
     ax1.set_xlabel('Energia (J)')
     ax1.set_ylabel('Entropia (J/K)')
     ax1.grid(True)
 
+    # Gráfico 2: Temperatura vs Energia
     ax2.plot(E, T, 'r-')
-    ax2.set_title('Temperatura vs Energia')
+    ax2.set_title('Temperatura vs Energia\nT = 2E/(3Nk)')
     ax2.set_xlabel('Energia (J)')
     ax2.set_ylabel('Temperatura (K)')
     ax2.grid(True)
 
+    # Linha teórica esperada
+    T_teorico = (2 * E) / (3 * N * k)
+    ax2.plot(E, T_teorico, 'k--', label='Relação teórica')
+    ax2.legend()
+
     plt.tight_layout()
     plt.show()
-
 
 ## 3. Fração de partículas - Versão Corrigida
 def plot_energy_fraction():
