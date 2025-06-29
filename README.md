@@ -40,16 +40,18 @@ A entropia (S) mede a desordem molecular. A temperatura (T) está intimamente re
 
 ### Nível Matemático
 Relações fundamentais:
+
 $$
 S = k \ln \Omega \approx \frac{3Nk}{2}\ln E + C
 $$
+
 $$
 \frac{1}{T} = \left(\frac{\partial S}{\partial E}\right)_{V,N}
 $$
 
 - **Derivada logarítmica**: $$∂(ln E)/∂E = 1/E → T = 2E/(3Nk)$$
 
-- **Integração (para processos irreversíveis)**:$$ΔS = ∫(1/T)dE $$
+- **Integração (para processos irreversíveis)**: $$ΔS = ∫(1/T)dE $$
 
 ### O que os Gráficos Mostram
 **Gráfico 1 (Entropia vs Energia)**:
@@ -69,11 +71,13 @@ Nem todas as moléculas têm a mesma energia! Esta análise mostra:
 
 ### Nível Matemático
 Fração cumulativa:
+
 $$
 F(E \leq E_0) = \int_0^{E_0} f(E)dE
 $$
+
 - **Integração numérica**: Calculada por soma de trapézios
-- **Normalização**: $$∫f(E)dE = 1 (100% das partículas)$$
+- **Normalização**: $$∫f(E)dE = 1 (100) $$
 - **Escala log**: Necessária para capturar variações em múltiplas ordens de grandeza
 
 ### O que os Gráficos Mostram
@@ -96,11 +100,17 @@ Todos os corpos emitem radiação térmica:
 
 ### Nível Matemático
 Lei de Stefan-Boltzmann:
-$$P = \epsilon \sigma A T^4$$
+
+$$
+P = \epsilon \sigma A T^4
+$$
+
 Energia total:
+
 $$
 E = \int_{t_1}^{t_2} P(T) dt = \epsilon \sigma A \int T^4 dt
 $$
+
 - **Derivada (sensibilidade térmica)**: $$dP/dT = 4εσAT³ $$
 - **Integral**: Área sob a curva P(T)
 
