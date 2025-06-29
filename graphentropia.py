@@ -174,15 +174,106 @@ def plot_energy_fraction():
     plt.tight_layout()
     plt.show()
 
+## 4. Lei de Stefan-Boltzmann - Radiação térmica
+
+def plot_stefan_boltzmann():
+    import matplotlib.pyplot as plt
+    from matplotlib.widgets import Slider
+    import numpy as np
+    from scipy.integrate import quad
+
+    sigma = 5.670374419e-8  # Constante de Stefan-Boltzmann
+
+    def stefan_boltzmann_power(T, A=1.0, emissividade=1.0):
+        return emissividade * sigma * A * T ** 4
+
+    def energia_total_radiada(T1, T2, A=1.0, emissividade=1.0):
+        integrand = lambda T: emissividade * sigma * A * T ** 4
+        energia, _ = quad(integrand, T1, T2)
+        return energia
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    plt.subplots_adjust(bottom=0.4)
+
+    # Intervalo inicial de temperatura
+    T_min = 200
+    T_max = 1500
+    T_range = np.linspace(100, 2000, 1000)
+
+    emissividade_init = 0.95
+    area_init = 1.0
+
+    power = stefan_boltzmann_power(T_range, area_init, emissividade_init)
+    line, = ax.plot(T_range, power, 'r-', lw=2, label="P = εσAT⁴")
+
+    fill = ax.fill_between(T_range, power, where=(T_range >= T_min) & (T_range <= T_max),
+                           color='orange', alpha=0.5, label="Energia irradiada")
+
+    ax.set_xlabel('Temperatura (K)')
+    ax.set_ylabel('Potência irradiada (W)')
+    ax.set_title('Lei de Stefan-Boltzmann - Potência vs Temperatura')
+    ax.grid(True)
+    ax.legend()
+
+    # Texto com energia total
+    energia_text = ax.text(0.02, 0.95, '', transform=ax.transAxes,
+                           fontsize=12, verticalalignment='top',
+                           bbox=dict(boxstyle="round", fc="w", ec="0.5"))
+
+    # Sliders
+    ax_emiss = plt.axes([0.25, 0.28, 0.65, 0.03])
+    ax_area = plt.axes([0.25, 0.23, 0.65, 0.03])
+    ax_T1 = plt.axes([0.25, 0.18, 0.65, 0.03])
+    ax_T2 = plt.axes([0.25, 0.13, 0.65, 0.03])
+
+    emiss_slider = Slider(ax_emiss, 'Emissividade (ε)', 0.01, 1.0, valinit=emissividade_init)
+    area_slider = Slider(ax_area, 'Área (m²)', 0.1, 10.0, valinit=area_init)
+    T1_slider = Slider(ax_T1, 'Temperatura Inicial (K)', 100, 1900, valinit=T_min)
+    T2_slider = Slider(ax_T2, 'Temperatura Final (K)', 200, 2000, valinit=T_max)
+
+    def update(val):
+        emiss = emiss_slider.val
+        area = area_slider.val
+        T1 = T1_slider.val
+        T2 = T2_slider.val
+
+        # Corrige ordem de T1 e T2
+        T1, T2 = min(T1, T2), max(T1, T2)
+
+        new_power = stefan_boltzmann_power(T_range, area, emiss)
+        line.set_ydata(new_power)
+
+        # Atualiza área preenchida
+        for coll in ax.collections[:]:
+            coll.remove()
+
+        ax.fill_between(T_range, new_power, where=(T_range >= T1) & (T_range <= T2),
+                        color='orange', alpha=0.5, label="Energia irradiada")
+
+        # Recalcula energia total
+        energia = energia_total_radiada(T1, T2, area, emiss)
+        energia_text.set_text(f"Energia irradiada de {T1:.0f}K a {T2:.0f}K:\n{energia:.2f} J")
+
+        fig.canvas.draw_idle()
+
+    for slider in [emiss_slider, area_slider, T1_slider, T2_slider]:
+        slider.on_changed(update)
+
+    update(None)  # Inicializa
+    plt.show()
+
+
+
 ## Menu principal
 def main():
     print("Aplicações do Cálculo I na Química - Visualizações")
     print("1. Distribuição de Boltzmann (interativa)")
     print("2. Entropia e Temperatura")
     print("3. Fração de partículas em intervalo de energia")
+    print("4. Lei de Stefan-Boltzmann - Potência irradiada com área e integração")
 
     while True:
-        choice = input("Escolha o gráfico (1-3) ou 'q' para sair: ")
+        choice = input("Escolha o gráfico (1-4) ou 'q' para sair: ")
 
         if choice == '1':
             plot_boltzmann_distribution()
@@ -190,6 +281,8 @@ def main():
             plot_entropy_temperature()
         elif choice == '3':
             plot_energy_fraction()
+        elif choice == '4':
+            plot_stefan_boltzmann()
         elif choice.lower() == 'q':
             break
         else:
