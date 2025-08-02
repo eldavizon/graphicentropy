@@ -2,31 +2,36 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 from scipy.integrate import quad
+import matplotlib.pyplot as plt
+import time
+
 
 # Configurações iniciais
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Cálculo I na Química")
 k = 1.380649e-23  # Constante de Boltzmann
+sigma = 5.670374419e-8  # Constante de Stefan-Boltzmann
 
 # CSS responsivo
 st.markdown("""
-    <style>
-    @media (max-width: 768px) {
-        .element-container:has(.stPlotlyChart) {
-            padding-left: 0px !important;
-            padding-right: 0px !important;
-        }
-        .stSlider > div {
-            padding: 0px 4px !important;
-        }
+<style>
+@media (max-width: 768px) {
+    .element-container:has(.stPlotlyChart) {
+        padding: 0px !important;
     }
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
+    .stSlider > div {
+        padding: 0px 4px !important;
     }
-    </style>
-    """, unsafe_allow_html=True)
+}
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
+# =======================================
 # Função 1 - Distribuição de Boltzmann
+# =======================================
 def boltzmann_distribution(E, T):
     with np.errstate(all='ignore'):
         coeff = (2 / np.sqrt(np.pi)) * (1 / (k * T) ** (3 / 2))
@@ -35,247 +40,195 @@ def boltzmann_distribution(E, T):
 def plot_boltzmann_distribution():
     st.subheader("Distribuição de Boltzmann")
 
-    T_init = st.slider("Temperatura (K)", 100, 1000, 300, key="boltzmann_temp")
-
+    T = st.slider("Temperatura (K)", 100, 1000, 300, key="boltzmann_temp")
     E = np.linspace(1e-25, 5e-20, 1000)
-    y = boltzmann_distribution(E, T_init)
+    y = boltzmann_distribution(E, T)
 
-    emp = 0.5 * k * T_init
-    eme = 1.5 * k * T_init
+    # Ponto mais provável e médio
+    emp = 0.5 * k * T
+    eme = 1.5 * k * T
+
+    # Intervalo para integração
+    st.markdown("##### Intervalo de energia para cálculo de probabilidade")
+    col1, col2 = st.columns(2)
+    with col1:
+        E1 = st.number_input("Energia mínima (J)", value=1e-24, format="%.1e")
+    with col2:
+        E2 = st.number_input("Energia máxima (J)", value=1e-21, format="%.1e")
+
+    E1, E2 = min(E1, E2), max(E1, E2)
+    prob, _ = quad(lambda E_: boltzmann_distribution(E_, T), E1, E2)
 
     fig = go.Figure()
+    fig.add_trace(go.Scatter(x=E, y=y, mode='lines', name='Distribuição', line=dict(width=3, color='royalblue')))
+    fig.add_trace(go.Scatter(x=[emp], y=[boltzmann_distribution(emp, T)], mode='markers+text', marker=dict(size=10, color='red'), text=["Emp (0.5kT)"], textposition="top right"))
+    fig.add_trace(go.Scatter(x=[eme], y=[boltzmann_distribution(eme, T)], mode='markers+text', marker=dict(size=10, color='green'), text=["Ē (1.5kT)"], textposition="bottom right"))
 
-    fig.add_trace(go.Scatter(
-        x=E, y=y,
-        mode='lines',
-        name='Distribuição de Boltzmann',
-        line=dict(width=3, color='royalblue')
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=[emp],
-        y=[boltzmann_distribution(emp, T_init)],
-        mode='markers+text',
-        name='Energia mais provável (0.5kT)',
-        marker=dict(color='red', size=10, symbol='x'),
-        text=["Emp"],
-        textposition='top right'
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=[eme],
-        y=[boltzmann_distribution(eme, T_init)],
-        mode='markers+text',
-        name='Energia média (1.5kT)',
-        marker=dict(color='green', size=10, symbol='circle'),
-        text=["Ē"],
-        textposition='bottom right'
-    ))
+    # Área do intervalo selecionado
+    E_mask = (E >= E1) & (E <= E2)
+    fig.add_trace(go.Scatter(x=E[E_mask], y=y[E_mask], fill='tozeroy', name='Intervalo', fillcolor='rgba(255,165,0,0.5)', line=dict(width=0)))
 
     fig.update_layout(
-        title=f"📊 Distribuição de Boltzmann a T = {T_init} K",
-        xaxis=dict(title='Energia (J)', tickformat=".1e", showgrid=True, gridcolor='lightgray'),
-        yaxis=dict(title='Densidade de probabilidade (1/J)', showgrid=True, gridcolor='lightgray'),
+        title=f"📊 Distribuição de Boltzmann a T = {T} K",
+        xaxis_title="Energia (J)",
+        yaxis_title="Densidade de probabilidade (1/J)",
         height=500,
         font=dict(size=15),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
         margin=dict(l=30, r=30, t=60, b=60),
-        legend=dict(
-            orientation="h",           # horizontal
-            yanchor="bottom",
-            y=-0.3,                    # posição abaixo do gráfico
-            xanchor="center",
-            x=0.5
-        )
     )
 
     st.plotly_chart(fig, use_container_width=True)
+    st.success(f"🔍 Probabilidade de partícula com energia entre **{E1:.1e} J** e **{E2:.1e} J**: **{prob:.4f}**")
 
-# Função 2 - Entropia e Temperatura
-def plot_entropy_temperature():
-    st.subheader("Entropia e Temperatura")
 
-    N = 1.0
-    E = np.linspace(1e-21, 5e-21, 100)
-    S = k * (3 * N / 2) * np.log(E)
-    dSdE = np.gradient(S, E)
-    T = 1 / dSdE
-    T_teorico = (2 * E) / (3 * N * k)
+def boltzmann_energy_distribution(n, kT):
+    """
+    Gera n energias aleatórias com base na distribuição de Boltzmann via amostragem inversa.
+    """
+    E_max = 10 * kT
+    E = np.linspace(0, E_max, 1000)
+    f_E = (2 / np.sqrt(np.pi)) * (1 / (kT ** 1.5)) * np.sqrt(E) * np.exp(-E / kT)
+    f_E /= np.trapz(f_E, E)
 
-    fig1 = go.Figure()
-    fig1.add_trace(go.Scatter(x=E, y=S, mode='lines', name='Entropia S(E)', line=dict(color='blue')))
-    fig1.update_layout(
-        title='📈 Entropia em função da Energia',
-        xaxis=dict(title='Energia (J)', tickformat=".1e", showgrid=True, gridcolor='lightgray'),
-        yaxis=dict(title='Entropia (J/K)', showgrid=True, gridcolor='lightgray'),
-        height=400,
-        font=dict(size=14),
-        margin=dict(l=30, r=30, t=60, b=30)
+    cdf = np.cumsum(f_E)
+    cdf /= cdf[-1]
+    rand_vals = np.random.rand(n)
+    sampled_energies = np.interp(rand_vals, cdf, E)
+    return sampled_energies
+
+
+def plot_boltzmann_animation():
+    st.title("Distribuição de Boltzmann - Simulação de Partículas (Ar Atmosférico)")
+
+    # ---- Parâmetros físicos reais ----
+    k_B = 1.380649e-23  # Constante de Boltzmann (J/K)
+    molar_mass = 0.02897  # kg/mol (massa molar do ar)
+    N_A = 6.02214076e23  # mol^-1
+    m = molar_mass / N_A  # massa de uma molécula (~4.8e-26 kg)
+
+    # ---- Interface ----
+    n_particles = st.slider("Número de partículas", 50, 500, 300, step=10)
+    temperature = st.slider("Temperatura (K)", 100, 1000, 300, step=10)
+    real_speed_mode = st.checkbox("🔁 Ativar velocidades reais (sem escala visual)")
+
+    # Dimensões físicas reais da sala (5m x 5m em 2D)
+    box_size = 5.0  # metros
+    dt = 0.01  # intervalo de tempo em segundos por frame
+
+    st.markdown(
+        """
+        Esta simulação usa a **distribuição de Boltzmann real** para calcular a velocidade de cada molécula de ar.  
+        O botão acima ativa/desativa o modo com **velocidade real sem escala visual** (pode parecer rápido demais).
+        """
     )
 
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=E, y=T, mode='lines', name='T = (∂S/∂E)⁻¹', line=dict(color='red')))
-    fig2.add_trace(go.Scatter(x=E, y=T_teorico, mode='lines', name='T = 2E/3Nk', line=dict(color='black', dash='dash')))
-    fig2.update_layout(
-        title='📈 Temperatura vs Energia',
-        xaxis=dict(title='Energia (J)', tickformat=".1e", showgrid=True, gridcolor='lightgray'),
-        yaxis=dict(title='Temperatura (K)', showgrid=True, gridcolor='lightgray'),
-        height=400,
-        font=dict(size=14),
-        margin=dict(l=30, r=30, t=60, b=30)
-    )
+    # ---- Inicialização ----
+    positions = np.random.rand(n_particles, 2) * box_size
+    angles = np.random.rand(n_particles) * 2 * np.pi
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.plotly_chart(fig1, use_container_width=True)
-    with col2:
-        st.plotly_chart(fig2, use_container_width=True)
+    # Gera energias e calcula velocidades reais
+    energies = boltzmann_energy_distribution(n_particles, kT=k_B * temperature)
+    speeds = np.sqrt(2 * energies / m)  # m/s
 
+    # Aplica escala visual apenas se modo real não estiver ativado
+    if real_speed_mode:
+        scaled_speeds = speeds
+        st.warning("⚠️ Velocidades reais ativadas: partículas podem atravessar a caixa muito rápido.")
+    else:
+        # Aplica fator de escala visual (ex: 0.03 * box_size / máx. velocidade)
+        scale_factor = 0.03 * box_size / speeds.max()
+        scaled_speeds = speeds * scale_factor
 
-# Função 3 - Fração de partículas
-def plot_energy_fraction():
-    st.subheader("Fração de Partículas em Intervalo de Energia")
+    velocities = np.stack((np.cos(angles), np.sin(angles)), axis=1) * scaled_speeds[:, np.newaxis]
 
-    T = st.slider("Temperatura (K)", 100, 1000, 300, key="energy_frac_temp")
+    # Layout centralizado
+    left, center, right = st.columns([1, 2, 1])
+    with center:
+        canvas = st.empty()
 
-    def boltzmann_distribution(E, T):
-        with np.errstate(all='ignore'):
-            log_coeff = np.log(2 / np.sqrt(np.pi)) + 1.5 * np.log(1 / (k * T))
-            log_val = log_coeff + 0.5 * np.log(E) - E / (k * T)
-            return np.exp(log_val)
+    for frame in range(200):
+        positions += velocities * dt
 
-    E_min = 1e-24
-    E_max = 5 * k * T
-    E_values = np.logspace(np.log10(E_min), np.log10(E_max), 500)
-    f_E = boltzmann_distribution(E_values, T)
-    total_integral = np.trapezoid(f_E, E_values)
-    f_E_normalized = f_E / total_integral
-    cumulative = np.insert(np.cumsum(f_E_normalized[:-1] * np.diff(E_values)), 0, 0)
+        # Reflexão nas bordas
+        for i in range(n_particles):
+            for j in range(2):
+                if positions[i, j] < 0 or positions[i, j] > box_size:
+                    velocities[i, j] *= -1
+                    positions[i, j] = np.clip(positions[i, j], 0, box_size)
 
-    fig1 = go.Figure()
-    fig1.add_trace(go.Scatter(
-        x=E_values, y=f_E_normalized,
-        mode='lines', name='Distribuição Normalizada',
-        line=dict(color='blue', width=2)
-    ))
-    fig1.update_layout(
-        title='🔍 Distribuição de Energia (normalizada)',
-        xaxis=dict(title='Energia (J)', type='log', tickformat=".1e", showgrid=True, gridcolor='lightgray'),
-        yaxis=dict(title='Densidade de Probabilidade', showgrid=True, gridcolor='lightgray'),
-        height=400,
-        font=dict(size=14),
-        margin=dict(l=30, r=30, t=60, b=30)
-    )
+        # Coloração por velocidade
+        actual_speeds = np.linalg.norm(velocities, axis=1)
+        norm_speeds = (actual_speeds - actual_speeds.min()) / np.ptp(actual_speeds)
+        colors = plt.cm.plasma(norm_speeds)
 
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(
-        x=E_values, y=cumulative,
-        mode='lines', name='Fração acumulada',
-        line=dict(color='red', width=2)
-    ))
-    for frac in [0.25, 0.5, 0.75, 0.9]:
-        idx = np.argmin(np.abs(cumulative - frac))
-        fig2.add_trace(go.Scatter(
-            x=[E_values[idx]], y=[cumulative[idx]],
-            mode='markers+text',
-            marker=dict(color='black', size=8),
-            text=[f'{frac*100:.0f}%'],
-            textposition='top right',
-            showlegend=False
-        ))
+        # Gráfico
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.set_xlim(0, box_size)
+        ax.set_ylim(0, box_size)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_facecolor('black')
+        ax.scatter(positions[:, 0], positions[:, 1], c=colors, s=10, alpha=0.85)
+        ax.set_title(f"T = {temperature} K", color="white", fontsize=10)
 
-    fig2.update_layout(
-        title='📈 Fração Acumulada de Partículas',
-        xaxis=dict(title='Energia (J)', type='log', tickformat=".1e", showgrid=True, gridcolor='lightgray'),
-        yaxis=dict(title='Fração com E ≤ E₀', showgrid=True, gridcolor='lightgray'),
-        height=400,
-        font=dict(size=14),
-        margin=dict(l=30, r=30, t=60, b=30)
-    )
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.plotly_chart(fig1, use_container_width=True)
-    with col2:
-        st.plotly_chart(fig2, use_container_width=True)
-
-
+        with center:
+            canvas.pyplot(fig)
+        plt.close(fig)
+        time.sleep(0.01)
+# =======================================
 # Função 4 - Lei de Stefan-Boltzmann
+# =======================================
 def plot_stefan_boltzmann():
     st.subheader("Lei de Stefan-Boltzmann")
 
-    sigma = 5.670374419e-8
-
-    def stefan_boltzmann_power(T, A=1.0, emissividade=1.0):
-        return emissividade * sigma * A * T ** 4
-
-    def energia_total_radiada(T1, T2, A=1.0, emissividade=1.0):
-        integrand = lambda T: emissividade * sigma * A * T ** 4
-        energia, _ = quad(integrand, T1, T2)
-        return energia
-
-    with st.expander("Parâmetros de entrada"):
+    with st.expander("🔧 Parâmetros"):
         col1, col2 = st.columns(2)
         with col1:
-            emiss = st.slider('Emissividade (ε)', 0.01, 1.0, 0.95, key='emiss')
-            area = st.slider('Área (m²)', 0.1, 10.0, 1.0, key='area')
+            emiss = st.slider('Emissividade (ε)', 0.01, 1.0, 0.95)
+            area = st.slider('Área (m²)', 0.1, 10.0, 1.0)
         with col2:
-            T1 = st.slider('Temperatura Inicial (K)', 100, 1900, 200, key='T1')
-            T2 = st.slider('Temperatura Final (K)', 200, 2000, 1500, key='T2')
+            T1 = st.slider('Temperatura Inicial (K)', 100, 1900, 200)
+            T2 = st.slider('Temperatura Final (K)', 200, 2000, 1500)
 
     T1, T2 = min(T1, T2), max(T1, T2)
+
+    def P(T): return emiss * sigma * area * T**4
+    energia, _ = quad(P, T1, T2)
+
     T_range = np.linspace(100, 2000, 1000)
-    power = stefan_boltzmann_power(T_range, area, emiss)
-    energia = energia_total_radiada(T1, T2, area, emiss)
+    power = P(T_range)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=T_range, y=power, mode='lines', name="P = εσAT⁴", line=dict(color='red', width=2)))
-
+    fig.add_trace(go.Scatter(x=T_range, y=power, mode='lines', name='Potência irradiada (W)'))
     mask = (T_range >= T1) & (T_range <= T2)
-    fig.add_trace(go.Scatter(
-        x=T_range[mask], y=power[mask],
-        fill='tozeroy',
-        fillcolor='rgba(255,165,0,0.5)',
-        name="Energia irradiada",
-        line=dict(width=0)
-    ))
+    fig.add_trace(go.Scatter(x=T_range[mask], y=power[mask], fill='tozeroy', name='Energia total', fillcolor='rgba(255,165,0,0.5)', line=dict(width=0)))
 
     fig.update_layout(
-        title='🌞 Lei de Stefan-Boltzmann - Potência irradiada vs Temperatura',
-        xaxis=dict(title='Temperatura (K)', showgrid=True, gridcolor='lightgray'),
-        yaxis=dict(title='Potência (W)', showgrid=True, gridcolor='lightgray'),
-        height=450,
-        font=dict(size=14),
-        margin=dict(l=30, r=30, t=60, b=30),
-        legend=dict(x=0.01, y=0.99)
+        title='🌞 Potência irradiada vs Temperatura',
+        xaxis_title='Temperatura (K)',
+        yaxis_title='Potência (W)',
+        height=450
     )
-
     st.plotly_chart(fig, use_container_width=True)
-    st.info(f"**Energia irradiada de {T1:.0f}K a {T2:.0f}K:** {energia:.2f} J")
+    st.info(f"🔋 Energia irradiada entre **{T1}K** e **{T2}K**: **{energia:.2f} J**")
 
-
+# =======================================
+# Função Principal
+# =======================================
 def main():
     st.title("📈 Aplicações do Cálculo I na Química")
-
-    st.markdown("### 📚 Menu de Gráficos")
-    st.markdown("Selecione abaixo a visualização desejada:")
+    st.markdown("Explore abaixo algumas visualizações interativas envolvendo cálculo, energia e probabilidade:")
 
     options = {
         "1. Distribuição de Boltzmann": plot_boltzmann_distribution,
-        "2. Entropia e Temperatura": plot_entropy_temperature,
-        "3. Fração de partículas": plot_energy_fraction,
-        "4. Lei de Stefan-Boltzmann": plot_stefan_boltzmann
+        "2. Distribuição de Boltzmann (animação)": plot_boltzmann_animation,
+        "3. Lei de Stefan-Boltzmann": plot_stefan_boltzmann
     }
 
-    choice = st.selectbox(
-        label="Visualização:",
-        options=list(options.keys()),
-        index=0,
-        label_visibility="collapsed"  # mantém mais compacto
-    )
-
-    st.markdown("---")  # linha divisória visual
-    options[choice]()  # Executa a função escolhida
-
+    choice = st.selectbox("Selecione uma visualização:", list(options.keys()), index=0)
+    st.markdown("---")
+    options[choice]()  # Executa a função selecionada
 
 if __name__ == "__main__":
     main()
