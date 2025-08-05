@@ -44,9 +44,9 @@ def plot_boltzmann_distribution():
     E = np.linspace(1e-25, 5e-20, 1000)
     y = boltzmann_distribution(E, T)
 
-    # Ponto mais provável e médio
-    emp = 0.5 * k * T
-    eme = 1.5 * k * T
+    # Ponto mais provável e ponto médio
+    emp = 0.5 * k * T  # Energia mais provável (modo da distribuição)
+    eme = 1.5 * k * T  # Energia média
 
     # Intervalo para integração
     st.markdown("##### Intervalo de energia para cálculo de probabilidade")
@@ -60,13 +60,44 @@ def plot_boltzmann_distribution():
     prob, _ = quad(lambda E_: boltzmann_distribution(E_, T), E1, E2)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=E, y=y, mode='lines', name='Distribuição', line=dict(width=3, color='royalblue')))
-    fig.add_trace(go.Scatter(x=[emp], y=[boltzmann_distribution(emp, T)], mode='markers+text', marker=dict(size=10, color='red'), text=["Emp (0.5kT)"], textposition="top right"))
-    fig.add_trace(go.Scatter(x=[eme], y=[boltzmann_distribution(eme, T)], mode='markers+text', marker=dict(size=10, color='green'), text=["Ē (1.5kT)"], textposition="bottom right"))
 
-    # Área do intervalo selecionado
+    # Curva da distribuição
+    fig.add_trace(go.Scatter(
+        x=E, y=y,
+        mode='lines',
+        name='Distribuição de Boltzmann',
+        line=dict(width=3, color='royalblue')
+    ))
+
+    # Energia mais comum (modo) = 0.5kT
+    fig.add_trace(go.Scatter(
+        x=[emp], y=[boltzmann_distribution(emp, T)],
+        mode='markers+text',
+        name='Energia mais provável (Emp = 0.5kT)',
+        marker=dict(size=10, color='red'),
+        text=["Emp (0.5kT)"],
+        textposition="top right"
+    ))
+
+    # Energia média = 1.5kT
+    fig.add_trace(go.Scatter(
+        x=[eme], y=[boltzmann_distribution(eme, T)],
+        mode='markers+text',
+        name='Energia média (Ē = 1.5kT)',
+        marker=dict(size=10, color='green'),
+        text=["Ē (1.5kT)"],
+        textposition="bottom right"
+    ))
+
+    # Área preenchida (probabilidade entre E1 e E2)
     E_mask = (E >= E1) & (E <= E2)
-    fig.add_trace(go.Scatter(x=E[E_mask], y=y[E_mask], fill='tozeroy', name='Intervalo', fillcolor='rgba(255,165,0,0.5)', line=dict(width=0)))
+    fig.add_trace(go.Scatter(
+        x=E[E_mask], y=y[E_mask],
+        fill='tozeroy',
+        name=f"Área entre {E1:.1e} J e {E2:.1e} J",
+        fillcolor='rgba(255,165,0,0.5)',
+        line=dict(width=0)
+    ))
 
     fig.update_layout(
         title=f"📊 Distribuição de Boltzmann a T = {T} K",
@@ -79,7 +110,35 @@ def plot_boltzmann_distribution():
     )
 
     st.plotly_chart(fig, use_container_width=True)
-    st.success(f"🔍 Probabilidade de partícula com energia entre **{E1:.1e} J** e **{E2:.1e} J**: **{prob:.4f}**")
+
+    # Explicação do significado da área sob a curva
+    st.markdown(f"""
+    ✅ **Probabilidade** de uma partícula ter energia entre **{E1:.1e} J** e **{E2:.1e} J**:
+
+    $$
+    P(E_1 \\leq E \\leq E_2) = \\int_{{E_1}}^{{E_2}} f(E) \\, dE \\approx {prob:.4f}
+    $$
+
+    Onde a função densidade de probabilidade \\( f(E) \\) é dada por:
+
+    $$
+    f(E) = \\frac{{2}}{{\\sqrt{{\\pi}}}} \\cdot \\frac{{1}}{{(kT)^{{3/2}}}} \\cdot \\sqrt{{E}} \\cdot e^{{-E/(kT)}}
+    $$
+
+    Além disso:
+
+    - Energia mais provável (modo da distribuição):
+
+    $$
+    E_{{\\text{{mp}}}} = \\frac{{1}}{{2}}kT
+    $$
+
+    - Energia média:
+
+    $$
+    \\bar{{E}} = \\frac{{3}}{{2}}kT
+    $$
+    """)
 
 
 def boltzmann_energy_distribution(n, kT):
@@ -115,6 +174,14 @@ def plot_boltzmann_animation():
     # Dimensões físicas reais da sala (5m x 5m em 2D)
     box_size = 5.0  # metros
     dt = 0.01  # intervalo de tempo em segundos por frame
+
+    st.markdown(r"""
+    A velocidade de cada partícula é derivada da energia cinética conforme:
+
+    $$
+    v = \sqrt{\frac{2E}{m}}
+    $$
+    """)
 
     st.markdown(
         """
@@ -179,6 +246,9 @@ def plot_boltzmann_animation():
 # =======================================
 # Função 4 - Lei de Stefan-Boltzmann
 # =======================================
+# Constante de Stefan-Boltzmann
+sigma = 5.67e-8  # W/m²·K⁴
+
 def plot_stefan_boltzmann():
     st.subheader("Lei de Stefan-Boltzmann")
 
@@ -202,7 +272,11 @@ def plot_stefan_boltzmann():
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=T_range, y=power, mode='lines', name='Potência irradiada (W)'))
     mask = (T_range >= T1) & (T_range <= T2)
-    fig.add_trace(go.Scatter(x=T_range[mask], y=power[mask], fill='tozeroy', name='Energia total', fillcolor='rgba(255,165,0,0.5)', line=dict(width=0)))
+    fig.add_trace(go.Scatter(
+        x=T_range[mask], y=power[mask],
+        fill='tozeroy', name='Energia total',
+        fillcolor='rgba(255,165,0,0.5)', line=dict(width=0)
+    ))
 
     fig.update_layout(
         title='🌞 Potência irradiada vs Temperatura',
@@ -210,8 +284,73 @@ def plot_stefan_boltzmann():
         yaxis_title='Potência (W)',
         height=450
     )
-    st.plotly_chart(fig, use_container_width=True)
-    st.info(f"🔋 Energia irradiada entre **{T1}K** e **{T2}K**: **{energia:.2f} J**")
+
+    # Layout com duas colunas
+    col_grafico, col_texto = st.columns([3, 2])
+
+    with col_grafico:
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_texto:
+        st.markdown("### 🔍 Interpretação física")
+        st.markdown(r"""
+        A **Lei de Stefan-Boltzmann** afirma que a potência irradiada por um corpo negro é proporcional à quarta potência da sua temperatura absoluta:
+
+        $$
+        P(T) = \varepsilon \cdot \sigma \cdot A \cdot T^4
+        $$
+
+        **Onde:**
+
+        $$
+        \varepsilon \quad \text{: emissividade do material (entre 0 e 1)}
+        $$
+
+        $$
+        \sigma \approx 5.67 \times 10^{-8} \ \text{W/m}^2 \cdot \text{K}^4 \quad \text{: constante de Stefan-Boltzmann}
+        $$
+
+        $$
+        A \quad \text{: área da superfície emissora (m}^2\text{)}
+        $$
+
+        $$
+        T \quad \text{: temperatura absoluta (K)}
+        $$
+        """)
+
+        st.markdown("### 📐 Energia irradiada")
+        st.markdown(fr"""
+        A curva mostra a potência irradiada em função da temperatura.  
+        A **área sob a curva** entre **{T1}K** e **{T2}K** representa a **energia total irradiada**:
+
+        $$
+        E = \int_{{T_1}}^{{T_2}} P(T) \, dT = \int_{{T_1}}^{{T_2}} \varepsilon \cdot \sigma \cdot A \cdot T^4 \, dT
+        $$
+        """)
+
+        st.info(f"🔋 Energia irradiada entre **{T1}K** e **{T2}K**: **{energia:.2f} J**")
+
+        # Comparações energéticas
+        st.markdown("### 🔁 Equivalente energético:")
+
+        # Conversões
+        tempo_lampada_100W = energia / 100  # segundos
+        motores_carro = energia / 150000  # energia ~150kJ por min
+        energia_kWh = energia / 3.6e6
+        horas_residencia = energia_kWh / 0.5  # consumo médio 0.5 kWh/hora
+
+        st.markdown(f"- 💡 Manter uma **lâmpada de 100W** acesa por **{tempo_lampada_100W:.1f} segundos**")
+        st.markdown(f"- 🚗 Equivale à energia liberada por **{motores_carro:.2f} motores de carro** funcionando por 1 minuto")
+        st.markdown(f"- 🏘️ Supriria o consumo de uma residência média por **{horas_residencia:.2f} horas**")
+
+        with st.expander("🔎 Como essas estimativas foram feitas"):
+            st.markdown("""
+            - **Lâmpada de 100W**: 100W = 100J/s  
+            - **Motor de carro**: Consumo estimado de ~150 kJ por minuto de funcionamento contínuo  
+            - **Residência média**: 0.5 kWh/hora (considerando uma média de 500W de potência média contínua)
+            - **1 kWh = 3.6 × 10⁶ J**
+            """)
 
 # =======================================
 # Função Principal
