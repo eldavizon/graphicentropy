@@ -1,373 +1,329 @@
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
+from math import pi
 from scipy.integrate import quad
-import matplotlib.pyplot as plt
-import time
 
+# ===============================
+# Configurações iniciais & constantes
+# ===============================
+k = 1.380649e-23  # Constante de Boltzmann (J/K)
 
-# Configurações iniciais
-st.set_page_config(layout="wide", page_title="Cálculo I na Química")
-k = 1.380649e-23  # Constante de Boltzmann
-sigma = 5.670374419e-8  # Constante de Stefan-Boltzmann
-
-# CSS responsivo
-st.markdown("""
-<style>
-@media (max-width: 768px) {
-    .element-container:has(.stPlotlyChart) {
-        padding: 0px !important;
-    }
-    .stSlider > div {
-        padding: 0px 4px !important;
-    }
-}
-.block-container {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# =======================================
-# Função 1 - Distribuição de Boltzmann
-# =======================================
-def boltzmann_distribution(E, T):
-    with np.errstate(all='ignore'):
-        coeff = (2 / np.sqrt(np.pi)) * (1 / (k * T) ** (3 / 2))
+def boltzmann_energy_dist(E, T):
+    """
+    Distribuição de energia (densidade por unidade de energia) para 3 graus de liberdade translacionais:
+    f(E) = (2 / sqrt(pi)) * (1 / (k T)^(3/2)) * sqrt(E) * exp(-E/(k T))
+    (unidades: 1/J)
+    """
+    with np.errstate(all="ignore"):
+        coeff = (2.0 / np.sqrt(pi)) * (1.0 / (k * T) ** 1.5)
         return coeff * np.sqrt(E) * np.exp(-E / (k * T))
 
-def plot_boltzmann_distribution():
-    st.subheader("Distribuição de Boltzmann")
 
-    T = st.slider("Temperatura (K)", 100, 1000, 300, key="boltzmann_temp")
-    E = np.linspace(1e-25, 5e-20, 1000)
-    y = boltzmann_distribution(E, T)
-
-    # Ponto mais provável e ponto médio
-    emp = 0.5 * k * T  # Energia mais provável (modo da distribuição)
-    eme = 1.5 * k * T  # Energia média
-
-    # Intervalo para integração
-    st.markdown("##### Intervalo de energia para cálculo de probabilidade")
-    col1, col2 = st.columns(2)
-    with col1:
-        E1 = st.number_input("Energia mínima (J)", value=1e-24, format="%.1e")
-    with col2:
-        E2 = st.number_input("Energia máxima (J)", value=1e-21, format="%.1e")
-
-    E1, E2 = min(E1, E2), max(E1, E2)
-    prob, _ = quad(lambda E_: boltzmann_distribution(E_, T), E1, E2)
-
-    fig = go.Figure()
-
-    # Curva da distribuição
-    fig.add_trace(go.Scatter(
-        x=E, y=y,
-        mode='lines',
-        name='Distribuição de Boltzmann',
-        line=dict(width=3, color='royalblue')
-    ))
-
-    # Energia mais comum (modo) = 0.5kT
-    fig.add_trace(go.Scatter(
-        x=[emp], y=[boltzmann_distribution(emp, T)],
-        mode='markers+text',
-        name='Energia mais provável (Emp = 0.5kT)',
-        marker=dict(size=10, color='red'),
-        text=["Emp (0.5kT)"],
-        textposition="top right"
-    ))
-
-    # Energia média = 1.5kT
-    fig.add_trace(go.Scatter(
-        x=[eme], y=[boltzmann_distribution(eme, T)],
-        mode='markers+text',
-        name='Energia média (Ē = 1.5kT)',
-        marker=dict(size=10, color='green'),
-        text=["Ē (1.5kT)"],
-        textposition="bottom right"
-    ))
-
-    # Área preenchida (probabilidade entre E1 e E2)
-    E_mask = (E >= E1) & (E <= E2)
-    fig.add_trace(go.Scatter(
-        x=E[E_mask], y=y[E_mask],
-        fill='tozeroy',
-        name=f"Área entre {E1:.1e} J e {E2:.1e} J",
-        fillcolor='rgba(255,165,0,0.5)',
-        line=dict(width=0)
-    ))
-
-    fig.update_layout(
-        title=f"📊 Distribuição de Boltzmann a T = {T} K",
-        xaxis_title="Energia (J)",
-        yaxis_title="Densidade de probabilidade (1/J)",
-        height=500,
-        font=dict(size=15),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-        margin=dict(l=30, r=30, t=60, b=60),
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Explicação do significado da área sob a curva
-    st.markdown(f"""
-    ✅ **Probabilidade** de uma partícula ter energia entre **{E1:.1e} J** e **{E2:.1e} J**:
-
-    $$
-    P(E_1 \\leq E \\leq E_2) = \\int_{{E_1}}^{{E_2}} f(E) \\, dE \\approx {prob:.4f}
-    $$
-
-    Onde a função densidade de probabilidade \\( f(E) \\) é dada por:
-
-    $$
-    f(E) = \\frac{{2}}{{\\sqrt{{\\pi}}}} \\cdot \\frac{{1}}{{(kT)^{{3/2}}}} \\cdot \\sqrt{{E}} \\cdot e^{{-E/(kT)}}
-    $$
-
-    Além disso:
-
-    - Energia mais provável (modo da distribuição):
-
-    $$
-    E_{{\\text{{mp}}}} = \\frac{{1}}{{2}}kT
-    $$
-
-    - Energia média:
-
-    $$
-    \\bar{{E}} = \\frac{{3}}{{2}}kT
-    $$
-    """)
-
-
-def boltzmann_energy_distribution(n, kT):
+def maxwell_boltzmann_speed_dist(v, T, m):
     """
-    Gera n energias aleatórias com base na distribuição de Boltzmann via amostragem inversa.
+    Distribuição de velocidades (densidade por v) em 3D:
+    f(v) = 4π (m / (2π k T))^(3/2) v^2 exp(- m v^2 / (2 k T))
+    (unidades: 1/(m/s))
     """
-    E_max = 10 * kT
-    E = np.linspace(0, E_max, 1000)
-    f_E = (2 / np.sqrt(np.pi)) * (1 / (kT ** 1.5)) * np.sqrt(E) * np.exp(-E / kT)
-    f_E /= np.trapz(f_E, E)
-
-    cdf = np.cumsum(f_E)
-    cdf /= cdf[-1]
-    rand_vals = np.random.rand(n)
-    sampled_energies = np.interp(rand_vals, cdf, E)
-    return sampled_energies
+    with np.errstate(all="ignore"):
+        pref = 4.0 * pi * (m / (2.0 * pi * k * T)) ** 1.5
+        return pref * v ** 2 * np.exp(-m * v ** 2 / (2.0 * k * T))
 
 
-def plot_boltzmann_animation():
-    st.title("Distribuição de Boltzmann - Simulação de Partículas (Ar Atmosférico)")
+def stefan_boltzmann_power(T, A=1.0, emissivity=1.0):
+    sigma = 5.670374419e-8
+    return emissivity * sigma * A * T ** 4
 
-    # ---- Parâmetros físicos reais ----
-    k_B = 1.380649e-23  # Constante de Boltzmann (J/K)
-    molar_mass = 0.02897  # kg/mol (massa molar do ar)
-    N_A = 6.02214076e23  # mol^-1
-    m = molar_mass / N_A  # massa de uma molécula (~4.8e-26 kg)
 
-    # ---- Interface ----
-    n_particles = st.slider("Número de partículas", 50, 500, 300, step=10)
-    temperature = st.slider("Temperatura (K)", 100, 1000, 300, step=10)
-    real_speed_mode = st.checkbox("🔁 Ativar velocidades reais (sem escala visual)")
+def energia_total_radiada_numeric(T1, T2, A=1.0, emissivity=1.0):
+    integrand = lambda T: emissivity * 5.670374419e-8 * A * T ** 4
+    energia, _ = quad(integrand, T1, T2)
+    return energia
 
-    # Dimensões físicas reais da sala (5m x 5m em 2D)
-    box_size = 5.0  # metros
-    dt = 0.01  # intervalo de tempo em segundos por frame
 
-    st.markdown(r"""
-    A velocidade de cada partícula é derivada da energia cinética conforme:
+def main():
+    st.set_page_config(layout="wide", page_title="Derivação Interativa — Boltzmann")
 
-    $$
-    v = \sqrt{\frac{2E}{m}}
-    $$
-    """)
-
+    # CSS responsivo mínimo
     st.markdown(
         """
-        Esta simulação usa a **distribuição de Boltzmann real** para calcular a velocidade de cada molécula de ar.  
-        O botão acima ativa/desativa o modo com **velocidade real sem escala visual** (pode parecer rápido demais).
-        """
+        <style>
+        @media (max-width: 768px) {
+            .element-container:has(.stPlotlyChart) { padding-left: 0px !important; padding-right: 0px !important; }
+            .stSlider > div { padding: 0px 4px !important; }
+        }
+        .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+        .stExpander > .stMarkdown { font-size: 14px; }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
-    # ---- Inicialização ----
-    positions = np.random.rand(n_particles, 2) * box_size
-    angles = np.random.rand(n_particles) * 2 * np.pi
+    # ---------------------------
+    # Sidebar: parâmetros e opções
+    # ---------------------------
+    with st.sidebar:
+        st.title("Parâmetros")
+        T_global = st.slider("Temperatura (K) - controle global", 50, 1500, 300, step=10)
+        st.markdown("**Massa molecular por partícula** (em u = amu)")
+        mass_u = st.number_input("Massa (u)", value=28.0, step=1.0, format="%.4f")
+        u_to_kg = 1.66053906660e-27
+        m = mass_u * u_to_kg
+        st.markdown(f"Massa por partícula (kg): **{m:.3e}**")
+        st.markdown("---")
+        st.title("Opções de Visualização")
+        show_v2 = st.checkbox("Mostrar efeito do fator geométrico v² (comparar)", value=True)
+        show_lagrange = st.checkbox("Mostrar esboço do método de Lagrange", value=True)
+        show_normal_const = st.checkbox("Mostrar constantes analíticas de normalização", value=True)
+        st.markdown("---")
+        st.markdown("Dica: os sliders nas páginas individuais também mudam os gráficos localmente.")
 
-    # Gera energias e calcula velocidades reais
-    energies = boltzmann_energy_distribution(n_particles, kT=k_B * temperature)
-    speeds = np.sqrt(2 * energies / m)  # m/s
-
-    # Aplica escala visual apenas se modo real não estiver ativado
-    if real_speed_mode:
-        scaled_speeds = speeds
-        st.warning("⚠️ Velocidades reais ativadas: partículas podem atravessar a caixa muito rápido.")
-    else:
-        # Aplica fator de escala visual (ex: 0.03 * box_size / máx. velocidade)
-        scale_factor = 0.03 * box_size / speeds.max()
-        scaled_speeds = speeds * scale_factor
-
-    velocities = np.stack((np.cos(angles), np.sin(angles)), axis=1) * scaled_speeds[:, np.newaxis]
-
-    # Layout centralizado
-    left, center, right = st.columns([1, 2, 1])
-    with center:
-        canvas = st.empty()
-
-    for frame in range(200):
-        positions += velocities * dt
-
-        # Reflexão nas bordas
-        for i in range(n_particles):
-            for j in range(2):
-                if positions[i, j] < 0 or positions[i, j] > box_size:
-                    velocities[i, j] *= -1
-                    positions[i, j] = np.clip(positions[i, j], 0, box_size)
-
-        # Coloração por velocidade
-        actual_speeds = np.linalg.norm(velocities, axis=1)
-        norm_speeds = (actual_speeds - actual_speeds.min()) / np.ptp(actual_speeds)
-        colors = plt.cm.plasma(norm_speeds)
-
-        # Gráfico
-        fig, ax = plt.subplots(figsize=(5, 5))
-        ax.set_xlim(0, box_size)
-        ax.set_ylim(0, box_size)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_facecolor('black')
-        ax.scatter(positions[:, 0], positions[:, 1], c=colors, s=10, alpha=0.85)
-        ax.set_title(f"T = {temperature} K", color="white", fontsize=10)
-
-        with center:
-            canvas.pyplot(fig)
-        plt.close(fig)
-        time.sleep(0.01)
-# =======================================
-# Função 4 - Lei de Stefan-Boltzmann
-# =======================================
-# Constante de Stefan-Boltzmann
-sigma = 5.67e-8  # W/m²·K⁴
-
-def plot_stefan_boltzmann():
-    st.subheader("Lei de Stefan-Boltzmann")
-
-    with st.expander("🔧 Parâmetros"):
-        col1, col2 = st.columns(2)
-        with col1:
-            emiss = st.slider('Emissividade (ε)', 0.01, 1.0, 0.95)
-            area = st.slider('Área (m²)', 0.1, 10.0, 1.0)
-        with col2:
-            T1 = st.slider('Temperatura Inicial (K)', 100, 1900, 200)
-            T2 = st.slider('Temperatura Final (K)', 200, 2000, 1500)
-
-    T1, T2 = min(T1, T2), max(T1, T2)
-
-    def P(T): return emiss * sigma * area * T**4
-    energia, _ = quad(P, T1, T2)
-
-    T_range = np.linspace(100, 2000, 1000)
-    power = P(T_range)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=T_range, y=power, mode='lines', name='Potência irradiada (W)'))
-    mask = (T_range >= T1) & (T_range <= T2)
-    fig.add_trace(go.Scatter(
-        x=T_range[mask], y=power[mask],
-        fill='tozeroy', name='Energia total',
-        fillcolor='rgba(255,165,0,0.5)', line=dict(width=0)
-    ))
-
-    fig.update_layout(
-        title='🌞 Potência irradiada vs Temperatura',
-        xaxis_title='Temperatura (K)',
-        yaxis_title='Potência (W)',
-        height=450
+    # ---------------------------
+    # Walkthrough interativo (passos)
+    # ---------------------------
+    st.title("🔬 Ludwig Boltzmann — Dedução interativa (começando de PV = nRT)")
+    st.markdown(
+        "Escolha um passo abaixo para ver o raciocínio histórico-matemático, as ferramentas usadas e a demonstração numérica."
     )
 
-    # Layout com duas colunas
-    col_grafico, col_texto = st.columns([3, 2])
+    steps = [
+        "1. PV = nRT → Energia por molécula",
+        "2. Teoria cinética: P ↔ energia cinética média",
+        "3. Pergunta: como se distribui a energia?",
+        "4. Contagem de microestados → Entropia S = k ln Ω",
+        "5. Método dos multiplicadores de Lagrange (esboço)",
+        "6. Resultados: fator de Boltzmann e interpretação",
+        "7. Jacobiano / densidade de estados (v²)",
+        "8. Normalização (integrais gaussianas e função gama)",
+        "9. Experimento numérico: comparar candidatos",
+    ]
 
-    with col_grafico:
-        st.plotly_chart(fig, use_container_width=True)
+    step = st.selectbox("Selecione o passo:", steps, index=0)
 
-    with col_texto:
-        st.markdown("### 🔍 Interpretação física")
-        st.markdown(r"""
-        A **Lei de Stefan-Boltzmann** afirma que a potência irradiada por um corpo negro é proporcional à quarta potência da sua temperatura absoluta:
+    if step == steps[0]:
+        st.header("1 — PV = nRT → Energia por molécula")
+        st.write("Partimos da lei dos gases ideais:")
+        st.latex(r"PV = nRT.")
+        st.write(r"Com \(n = N/N_A\) e \(R = k N_A\) obtemos:")
+        st.latex(r"PV = N k T.")
+        st.write(r"Dividindo por \(N\):")
+        st.latex(r"\frac{P V}{N} = k T.")
+        st.write("Interpretação: \(kT\) tem dimensão de energia — liga temperatura à energia média por partícula.")
+        st.info("Ferramenta: álgebra básica e interpretação dimensional — conecta grandezas macroscópicas com energia microscópica.")
 
-        $$
-        P(T) = \varepsilon \cdot \sigma \cdot A \cdot T^4
-        $$
+    elif step == steps[1]:
+        st.header("2 — Teoria cinética: pressão e energia cinética média")
+        st.latex(r"P = \frac{1}{3} \frac{N m \langle v^2 \rangle}{V}.")
+        st.write("Comparando com \(P = \frac{N k T}{V}\) resulta:")
+        st.latex(r"\frac{1}{2} m \langle v^2 \rangle = \frac{3}{2} k T.")
+        st.write("Ou seja, a energia cinética média por partícula é \(\\tfrac{3}{2}kT\).")
+        st.info("Ferramenta: esperança matemática (média) e manipulação algébrica para ligar temperatura a energia cinética.")
 
-        **Onde:**
+    elif step == steps[2]:
+        st.header("3 — A pergunta central")
+        st.write("Se conhecemos a média \(\\langle E\\rangle = \\tfrac{3}{2} kT\), como as energias individuais se distribuem?")
+        st.write("Precisamos de uma **função de densidade de probabilidade** \(f(v)\) ou \(f(E)\) que descreva essa dispersão.")
+        st.info("Ferramenta: formulação probabilística — passamos do determinístico para o estatístico.")
 
-        $$
-        \varepsilon \quad \text{: emissividade do material (entre 0 e 1)}
-        $$
+    elif step == steps[3]:
+        st.header("4 — Contagem de microestados e entropia")
+        st.latex(r"S = k \ln \Omega.")
+        st.write("Procuramos a distribuição \(f\) que maximize \(\Omega\) (ou \(S\)) sob restrições (normalização e energia média fixa).")
+        st.info("Ferramenta: combinatória e logaritmos — simplificam a maximização.")
 
-        $$
-        \sigma \approx 5.67 \times 10^{-8} \ \text{W/m}^2 \cdot \text{K}^4 \quad \text{: constante de Stefan-Boltzmann}
-        $$
+    elif step == steps[4]:
+        st.header("5 — Método dos multiplicadores de Lagrange (esboço)")
+        st.write("Queremos maximizar \(S[f]\) sujeito a:")
+        st.latex(r"\int f(\mathbf{v})\, d^3v = 1")
+        st.latex(r"\int \tfrac{1}{2} m v^2 f(\mathbf{v})\, d^3v = \tfrac{3}{2}kT")
+        st.write("Definimos o funcional:")
+        st.latex(r"\mathcal{L}[f] = \ln\Omega[f] - \alpha\left(\int f - 1\right) - \beta\left(\int \tfrac{1}{2}mv^2 f - \tfrac{3}{2}kT\right)")
+        st.write(r"A condição \(\delta \mathcal{L}/\delta f = 0\) leva a:")
+        st.latex(r"f(\mathbf{v}) \propto e^{-\beta \tfrac{1}{2} m v^2}.")
+        st.write(r"Identificando \(\beta = 1/(kT)\) obtemos o exponencial de Boltzmann.")
+        if show_lagrange:
+            st.write("**Por que usar Lagrange?**")
+            st.write("- É a ferramenta sistemática para otimização com restrições; transforma um problema restrito em um sem restrições.")
+            st.write("- Em linguagem física, estamos escolhendo *a distribuição mais provável* (maior número de microestados) que satisfaça as condições macroscopicamente observadas.")
+        st.info("Ferramenta: cálculo variacional e multiplicadores de Lagrange — essencial para derivar densidades de probabilidade condicionadas.")
 
-        $$
-        A \quad \text{: área da superfície emissora (m}^2\text{)}
-        $$
+    elif step == steps[5]:
+        st.header("6 — Do exponencial em v ao fator de Boltzmann em E")
+        st.write(r"A solução funcional exponencial depende da energia cinética: \(E=\tfrac{1}{2}m v^2\).")
+        st.write("Escrevendo em termos de energia:")
+        st.latex(r"f(E) \propto e^{-E/(kT)}.")
+        st.write("Esse é o **fator de Boltzmann**: estados com energia maior têm probabilidade exponencialmente menor.")
+        st.info("Ferramenta: identificação de constantes (β→1/kT) e mudança de variável energia↔velocidade.")
 
-        $$
-        T \quad \text{: temperatura absoluta (K)}
-        $$
-        """)
+    elif step == steps[6]:
+        st.header("7 — O Jacobiano e o termo \(v^2\) (densidade de estados)")
+        st.write("Quando passamos de \(f(\mathbf{v})\) (densidade no espaço vetorial 3D) para \(f(v)\) (densidade do módulo da velocidade),")
+        st.write("temos de multiplicar pelo elemento de volume em coordenadas esféricas:")
+        st.latex(r"d^3v = 4\pi v^2 dv.")
+        st.write("Portanto:")
+        st.latex(r"f(v)\,dv \propto 4\pi v^2 e^{-m v^2/(2kT)} dv.")
+        st.write("O termo \(4\pi v^2\) é o **Jacobiano** (mudança de variável) — representa a densidade de estados geométrica.")
+        if show_v2:
+            st.info("Ferramenta: cálculo multivariado — mudança de variáveis e interpretação geométrica (mais microestados a velocidades maiores).")
 
-        st.markdown("### 📐 Energia irradiada")
-        st.markdown(fr"""
-        A curva mostra a potência irradiada em função da temperatura.  
-        A **área sob a curva** entre **{T1}K** e **{T2}K** representa a **energia total irradiada**:
+    elif step == steps[7]:
+        st.header("8 — Normalização (integrais gaussianas e função gama)")
+        st.write("Para que \(f(v)\) seja probabilidade válida, impomos:")
+        st.latex(r"\int_0^\infty f(v) dv = 1.")
+        st.write("Isso define a constante:")
+        st.latex(r"A = 4\pi \left(\frac{m}{2\pi k T}\right)^{3/2}.")
+        st.write("A normalização envolve integrais do tipo \(\int_0^\infty v^2 e^{-a v^2} dv\) que se resolvem com transformações que levam à função gama.")
+        if show_normal_const:
+            st.write("Relação útil (para referência):")
+            st.latex(r"\int_0^\infty x^{n} e^{-a x^2} dx = \frac{1}{2} a^{-(n+1)/2} \Gamma\!\left(\frac{n+1}{2}\right).")
+            st.write("Usando isso com \(n=2\) recuperamos a forma do prefator analítico.")
+        st.info("Ferramenta: técnicas de integração (gaussiana) e conhecimento de funções especiais (Γ).")
 
-        $$
-        E = \int_{{T_1}}^{{T_2}} P(T) \, dT = \int_{{T_1}}^{{T_2}} \varepsilon \cdot \sigma \cdot A \cdot T^4 \, dT
-        $$
-        """)
+    elif step == steps[8]:
+        st.header("9 — Experimento numérico: comparar candidatos")
+        st.write("Construímos candidatos simples e verificamos se cumprem normalização e a restrição de energia média.")
+        st.write("- Candidato A: \(e^{-E/(kT)}\)")
+        st.write("- Candidato B: \(\sqrt{E}\, e^{-E/(kT)}\)  (simula densidade de estados)")
+        st.write("A normalização e a energia média mostram por que a forma final combina ambos os fatores.")
+        st.info("Ferramenta: integração numérica para testar hipóteses e validar escolhas analíticas.")
 
-        st.info(f"🔋 Energia irradiada entre **{T1}K** e **{T2}K**: **{energia:.2f} J**")
-
-        # Comparações energéticas
-        st.markdown("### 🔁 Equivalente energético:")
-
-        # Conversões
-        tempo_lampada_100W = energia / 100  # segundos
-        motores_carro = energia / 150000  # energia ~150kJ por min
-        energia_kWh = energia / 3.6e6
-        horas_residencia = energia_kWh / 0.5  # consumo médio 0.5 kWh/hora
-
-        st.markdown(f"- 💡 Manter uma **lâmpada de 100W** acesa por **{tempo_lampada_100W:.1f} segundos**")
-        st.markdown(f"- 🚗 Equivale à energia liberada por **{motores_carro:.2f} motores de carro** funcionando por 1 minuto")
-        st.markdown(f"- 🏘️ Supriria o consumo de uma residência média por **{horas_residencia:.2f} horas**")
-
-        with st.expander("🔎 Como essas estimativas foram feitas"):
-            st.markdown("""
-            - **Lâmpada de 100W**: 100W = 100J/s  
-            - **Motor de carro**: Consumo estimado de ~150 kJ por minuto de funcionamento contínuo  
-            - **Residência média**: 0.5 kWh/hora (considerando uma média de 500W de potência média contínua)
-            - **1 kWh = 3.6 × 10⁶ J**
-            """)
-
-# =======================================
-# Função Principal
-# =======================================
-def main():
-    st.title("📈 Aplicações do Cálculo I na Química")
-    st.markdown("Explore abaixo algumas visualizações interativas envolvendo cálculo, energia e probabilidade:")
-
+    # ---------------------------
+    # Menu principal com funções de plot
+    # ---------------------------
+    st.markdown("---")
+    st.header("Menu de visualizações")
     options = {
-        "1. Distribuição de Boltzmann": plot_boltzmann_distribution,
-        "2. Distribuição de Boltzmann (animação)": plot_boltzmann_animation,
-        "3. Lei de Stefan-Boltzmann": plot_stefan_boltzmann
+        "Distribuição de Boltzmann (energia) — gráfico + dedução": "boltzmann",
+        "Entropia e Temperatura — S(E) e T(E)": "entropy",
+        "Fração de partículas até E₀": "cdf",
+        "Potência radiada (Stefan-Boltzmann)": "stefan_boltzmann",
     }
 
-    choice = st.selectbox("Selecione uma visualização:", list(options.keys()), index=0)
+    choice = st.selectbox("Escolha a visualização:", list(options.keys()))
+
+    if options[choice] == "boltzmann":
+        st.subheader("Distribuição de energia (Boltzmann)")
+        T = st.slider("Temperatura (K)", 50, 1500, T_global, step=10)
+        E_vals = np.linspace(0, 10 * k * T, 500)
+        fE = boltzmann_energy_dist(E_vals, T)
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(x=E_vals / (k * T), y=fE, mode="lines", name=r"$f(E)$")
+        )
+        fig.update_layout(
+            title="Distribuição de energia de Boltzmann",
+            xaxis_title=r"$E / (kT)$",
+            yaxis_title=r"$f(E)$ (densidade por energia)",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif options[choice] == "entropy":
+        st.subheader("Entropia e Temperatura (qualitativo)")
+        st.latex(r"S = k \ln \Omega")
+        st.latex(r"\frac{1}{T} = \frac{\partial S}{\partial E}")
+        st.write("Esta visualização é conceitual e não mostra cálculos numéricos precisos.")
+        st.info("É uma demonstração visual da relação entre entropia, energia e temperatura.")
+
+    elif options[choice] == "cdf":
+        st.subheader("Fração acumulada de partículas até energia E₀")
+        T = st.slider("Temperatura (K)", 50, 1500, T_global, step=10, key="cdf_T")
+        E0 = st.slider("Energia limite E₀ (em kT)", 0.1, 10.0, 3.0, step=0.1)
+        integral = quad(
+            lambda E: boltzmann_energy_dist(E, T), 0, E0 * k * T
+        )[0]
+        st.latex(
+            r"F(E_0) = \int_0^{E_0} f(E) dE = "
+            + f"{integral:.4f}"
+        )
+        st.write(
+            f"A fração acumulada de partículas com energia até {E0:.1f} kT é aproximadamente {integral:.4f}."
+        )
+
+    elif options[choice] == "stefan_boltzmann":
+        st.subheader("Potência radiada (Lei de Stefan-Boltzmann)")
+        T1 = st.number_input("Temperatura inicial T1 (K)", value=300.0)
+        T2 = st.number_input("Temperatura final T2 (K)", value=1000.0)
+        A = st.number_input("Área (m²)", value=1.0)
+        emissivity = st.slider("Emissividade", 0.0, 1.0, 1.0, 0.01)
+        potencia = stefan_boltzmann_power(T2, A, emissivity)
+        energia = energia_total_radiada_numeric(T1, T2, A, emissivity)
+        st.latex(r"P = \varepsilon \sigma A T^4")
+        st.write(f"Potência radiada a T2 = {T2} K: {potencia:.3e} W")
+        st.write(f"Energia total radiada de {T1} K a {T2} K: {energia:.3e} J")
+
+    # ---------------------------
+    # Pequeno laboratório numérico — comparação candidatos
+    # ---------------------------
     st.markdown("---")
-    options[choice]()  # Executa a função selecionada
+    st.header("Mini-laboratório: comparação de funções candidatas")
+
+    T_lab = st.slider("Temperatura para o mini-lab (K)", 50, 1500, 300, step=10, key="lab_T")
+    E_vals_lab = np.linspace(0, 10 * k * T_lab, 500)
+
+    fA = np.exp(-E_vals_lab / (k * T_lab))
+    fB = np.sqrt(E_vals_lab) * np.exp(-E_vals_lab / (k * T_lab))
+
+    # Normalizar
+    normA = np.trapz(fA, E_vals_lab)
+    normB = np.trapz(fB, E_vals_lab)
+    fA_norm = fA / normA
+    fB_norm = fB / normB
+
+    # Médias
+    meanA = np.trapz(E_vals_lab * fA_norm, E_vals_lab)
+    meanB = np.trapz(E_vals_lab * fB_norm, E_vals_lab)
+
+    st.write("Distribuição A: \(f_A(E) \propto e^{-E/(kT)}\)")
+    st.write(f"Integral (normalização) = {normA:.4f}")
+    st.write(f"Energia média calculada = {meanA / k:.4f} kT (esperado: 3/2)")
+
+    st.write("Distribuição B: \(f_B(E) \propto \sqrt{E} e^{-E/(kT)}\)")
+    st.write(f"Integral (normalização) = {normB:.4f}")
+    st.write(f"Energia média calculada = {meanB / k:.4f} kT (esperado: 3/2)")
+
+    fig_lab = go.Figure()
+    fig_lab.add_trace(go.Scatter(x=E_vals_lab / (k * T_lab), y=fA_norm, mode="lines", name=r"$f_A(E)$"))
+    fig_lab.add_trace(go.Scatter(x=E_vals_lab / (k * T_lab), y=fB_norm, mode="lines", name=r"$f_B(E)$"))
+    fig_lab.update_layout(
+        title="Comparação das funções candidatas (normalizadas)",
+        xaxis_title=r"$E / (kT)$",
+        yaxis_title="f(E) normalizado",
+    )
+    st.plotly_chart(fig_lab, use_container_width=True)
+
+    # Deduções matemáticas detalhadas
+    st.markdown("---")
+    st.header("Deduções matemáticas — passo a passo")
+
+    st.latex(r"""
+    f_v(v) = 4\pi\left(\frac{m}{2\pi k T}\right)^{3/2} v^2 e^{- \frac{m v^2}{2 k T}}
+    """)
+
+    st.write(r"Usando \(E=\tfrac{1}{2} m v^2\) e a mudança de variável \(dv = dE / (m v)\), substituindo \(v = \sqrt{2E/m}\) obtemos:")
+
+    st.latex(r"""
+    f_E(E) \propto \sqrt{E}\, e^{-E/(kT)}.
+    """)
+
+    st.write("A normalização analítica leva ao fator:")
+
+    st.latex(r"""
+    f_E(E) = \frac{2}{\sqrt{\pi}} \frac{1}{(kT)^{3/2}} \sqrt{E}\, e^{-E/(kT)}.
+    """)
+
+    st.write(r"Energia mais provável e média (derivações mostradas anteriormente):")
+
+    st.latex(r"""
+    E_{mp} = \tfrac{1}{2}kT \\
+    \langle E \rangle = \tfrac{3}{2}kT
+    """)
+
+    st.write("Ferramentas matemáticas usadas e porquê:")
+    st.write("- Álgebra e manipulação de constantes: para ligar \(PV=nRT\) a energia por partícula.")
+    st.write("- Cálculo variacional (Lagrange): para derivar a forma exponencial como a distribuição mais provável.")
+    st.write("- Mudança de variáveis e Jacobiano: para transformar de \(f(\mathbf v)\) para \(f(E)\) e contar estados.")
+    st.write("- Integração (gaussiana/função gama): para normalizar e calcular médias.")
 
 if __name__ == "__main__":
     main()
